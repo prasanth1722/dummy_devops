@@ -33,6 +33,6 @@ jobs:
 
     - name: Run Snake Game (Headless Mode)
       run: |
-        python snake_game.py &
+        python snake.py &
         sleep 10
-        pkill -f snake_game.py
+        pkill -f snake.py
