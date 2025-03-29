@@ -25,7 +25,6 @@ steps:
       - '--region=us-central1'
       - '--allow-unauthenticated'
       - '--timeout=300s'
-      - '--set-env-vars=PORT=8080'
 
 options:
   logging: CLOUD_LOGGING_ONLY
