@@ -1,69 +1,33 @@
 steps:
-   - name: 'gcr.io/cloud-builders/docker'
-     args: 
+  # Step 1: Build Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
       - 'build'
       - '-t'
       - 'gcr.io/$PROJECT_ID/my-python-app'
       - '.'
 
-   - name: 'gcr.io/cloud-builders/docker'
-     args: 
+  # Step 2: Push Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
       - 'push'
       - 'gcr.io/$PROJECT_ID/my-python-app'
 
-   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-     args:
-       - 'run'
-       - 'deploy'
-       - 'my-python-app'
-       - '--image'
-       - 'gcr.io/$PROJECT_ID/my-python-app'
-       - '--platform'
-       - 'managed'
-       - '--region'
-       - 'us-central1'
-       - '--allow-unauthenticated'
+  # NEW Step 3: List images (example additional step)
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'container'
+      - 'images'
+      - 'list'
+      - '--repository=gcr.io/$PROJECT_ID'
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+  # Step 4: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'my-python-app'
+      - '--image=gcr.io/$PROJECT_ID/my-python-app'
+      - '--platform=managed'
+      - '--region=us-central1'
+      - '--allow-unauthenticated'
