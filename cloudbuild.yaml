@@ -13,7 +13,9 @@ steps:
       - 'push'
       - 'gcr.io/$PROJECT_ID/my-python-app'
 
-  # Step 3: Deploy to Cloud Run
+  steps:
+  # ... (keep existing build/push steps) ...
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -24,5 +26,7 @@ steps:
       - '--platform=managed'
       - '--region=us-central1'
       - '--allow-unauthenticated'
+      - '--timeout=300s'  # Increased timeout
+      - '--set-env-vars=PORT=8080'  # Explicit port setting
 options:
   logging: CLOUD_LOGGING_ONLY
