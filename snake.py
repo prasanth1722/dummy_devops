@@ -1,6 +1,18 @@
 import pygame
 import time
 import random
+import os
+from flask import Flask  # Example for web apps
+
+app = Flask(__name__)
+port = int(os.environ.get("PORT", 8080))  # Cloud Run sets $PORT
+
+@app.route('/')
+def hello():
+    return "Snake game running!"
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=port)  # Must listen on 0.0.0.0
 
 # Initialize pygame
 pygame.init()
