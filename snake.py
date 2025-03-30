@@ -141,4 +141,10 @@ threading.Thread(target=broadcast_state, daemon=True).start()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
-    socketio.run(app, host='0.0.0.0', port=port)
+    # Critical settings for Cloud Run:
+    socketio.run(app,
+                host='0.0.0.0',
+                port=port,
+                allow_unsafe_werkzeug=True,  # Required for Cloud Run
+                debug=False,
+                use_reloader=False)
