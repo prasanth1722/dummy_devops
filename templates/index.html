@@ -8,10 +8,13 @@
             flex-direction: column; 
             align-items: center; 
             font-family: Arial;
+            background-color: #222;
+            color: white;
         }
         canvas { 
-            border: 1px solid black; 
-            background: #000; 
+            border: 2px solid #444; 
+            background: #000;
+            margin-top: 20px;
         }
         #score { 
             font-size: 24px; 
@@ -21,14 +24,23 @@
             color: red; 
             font-size: 32px; 
             display: none;
+            margin-top: 20px;
+        }
+        .controls {
+            margin-top: 20px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <h1>Snake Game</h1>
     <div id="score">Score: 0</div>
-    <div id="game-over">GAME OVER! Press Space</div>
+    <div id="game-over">GAME OVER! Press Space to Restart</div>
     <canvas id="gameCanvas" width="600" height="400"></canvas>
+    
+    <div class="controls">
+        <p>Use Arrow Keys or Swipe to Control</p>
+    </div>
 
     <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
     <script>
@@ -42,24 +54,31 @@
         const COLORS = {
             snake: '#3498db',
             food: '#2ecc71',
-            text: '#ecf0f1'
+            background: '#111',
+            border: '#333'
         };
 
         // Handle game state updates
         socket.on('game_state', (state) => {
             // Clear canvas
-            ctx.fillStyle = 'black';
+            ctx.fillStyle = COLORS.background;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = COLORS.border;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
             // Draw snake
             ctx.fillStyle = COLORS.snake;
             state.snake.forEach(segment => {
                 ctx.fillRect(segment[0], segment[1], 10, 10);
+                ctx.strokeStyle = '#2980b9';
+                ctx.strokeRect(segment[0], segment[1], 10, 10);
             });
 
             // Draw food
             ctx.fillStyle = COLORS.food;
-            ctx.fillRect(state.food[0], state.food[1], 10, 10);
+            ctx.beginPath();
+            ctx.arc(state.food[0]+5, state.food[1]+5, 5, 0, Math.PI*2);
+            ctx.fill();
 
             // Update UI
             scoreElement.textContent = `Score: ${state.score}`;
@@ -81,6 +100,7 @@
         canvas.addEventListener('touchstart', (e) => {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
+            e.preventDefault();
         }, false);
 
         canvas.addEventListener('touchend', (e) => {
@@ -91,11 +111,23 @@
             const dy = touchEndY - touchStartY;
             
             if (Math.abs(dx) > Math.abs(dy)) {
-                socket.emit('keypress', { key: dx > 0 ? 'ArrowRight' : 'ArrowLeft' });
+                socket.emit('keypress', { 
+                    key: dx > 0 ? 'ArrowRight' : 'ArrowLeft' 
+                });
             } else {
-                socket.emit('keypress', { key: dy > 0 ? 'ArrowDown' : 'ArrowUp' });
+                socket.emit('keypress', { 
+                    key: dy > 0 ? 'ArrowDown' : 'ArrowUp' 
+                });
             }
+            e.preventDefault();
         }, false);
+
+        // Handle visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                socket.emit('pause');
+            }
+        });
     </script>
 </body>
 </html>
