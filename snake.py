@@ -1,7 +1,9 @@
 import pygame
 import random
 import os
-from flask import Flask, Response, request
+from flask import Flask, render_template
+from flask_socketio import SocketIO
+import threading
 import json
 
 # Initialize pygame in headless mode
@@ -9,6 +11,7 @@ os.environ['SDL_VIDEODRIVER'] = 'dummy'
 pygame.init()
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Game Constants
 WIDTH = 600
@@ -17,130 +20,125 @@ SNAKE_BLOCK = 10
 SNAKE_SPEED = 15
 
 # Game State
-game_state = {
-    "snake": [[WIDTH/2, HEIGHT/2]],
-    "food": [random.randrange(0, WIDTH-SNAKE_BLOCK, SNAKE_BLOCK), 
-             random.randrange(0, HEIGHT-SNAKE_BLOCK, SNAKE_BLOCK)],
-    "direction": "RIGHT",
-    "game_over": False
-}
+snake = []
+food = []
+current_direction = "RIGHT"
+game_over = False
+clients = set()
+
+def init_game():
+    global snake, food, current_direction, game_over
+    snake = [[WIDTH//2, HEIGHT//2]]
+    food = [
+        random.randrange(0, WIDTH-SNAKE_BLOCK, SNAKE_BLOCK),
+        random.randrange(0, HEIGHT-SNAKE_BLOCK, SNAKE_BLOCK)
+    ]
+    current_direction = "RIGHT"
+    game_over = False
+
+def game_loop():
+    global snake, food, current_direction, game_over
+    
+    while True:
+        if not clients:  # Pause game when no players
+            pygame.time.wait(100)
+            continue
+            
+        if game_over:
+            pygame.time.wait(100)
+            continue
+            
+        # Move snake
+        head = snake[0].copy()
+        if current_direction == "LEFT":
+            head[0] -= SNAKE_BLOCK
+        elif current_direction == "RIGHT":
+            head[0] += SNAKE_BLOCK
+        elif current_direction == "UP":
+            head[1] -= SNAKE_BLOCK
+        elif current_direction == "DOWN":
+            head[1] += SNAKE_BLOCK
+        
+        # Check collisions
+        if (head[0] >= WIDTH or head[0] < 0 or 
+            head[1] >= HEIGHT or head[1] < 0 or
+            head in snake):
+            game_over = True
+            continue
+            
+        snake.insert(0, head)
+        
+        # Check food
+        if head == food:
+            food = [
+                random.randrange(0, WIDTH-SNAKE_BLOCK, SNAKE_BLOCK),
+                random.randrange(0, HEIGHT-SNAKE_BLOCK, SNAKE_BLOCK)
+            ]
+        else:
+            snake.pop()
+        
+        pygame.time.delay(int(1000/SNAKE_SPEED))
+
+# Initialize game
+init_game()
+threading.Thread(target=game_loop, daemon=True).start()
 
 @app.route('/')
-def game_ui():
-    """Simple HTML UI for the game"""
-    return """
-    <html>
-    <body>
-    <h1>Snake Game</h1>
-    <div id="game"></div>
-    <script>
-    function updateGame() {
-        fetch('/state').then(r => r.json()).then(data => {
-            document.getElementById('game').innerHTML = 
-                `Score: ${data.snake.length}<br>
-                ${data.game_over ? 'GAME OVER' : ''}`;
-        });
-        setTimeout(updateGame, 100);
-    }
-    document.onkeydown = (e) => {
-        fetch('/move', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({key: e.key})
-        });
-    };
-    updateGame();
-    </script>
-    </body>
-    </html>
-    """
+def index():
+    return render_template('index.html')
 
-@app.route('/state')
-def get_state():
-    """Return current game state"""
-    return json.dumps(game_state)
+@socketio.on('connect')
+def handle_connect():
+    clients.add(request.sid)
+    if len(clients) == 1:  # First player resets game
+        init_game()
 
-@app.route('/move', methods=['POST'])
-def handle_move():
-    """Process keyboard input"""
-    global game_state
-    if game_state["game_over"]:
-        return "Game Over"
-    
-    key = request.json.get('key', '')
-    
-    # Update direction
-    if key == "ArrowLeft" and game_state["direction"] != "RIGHT":
-        game_state["direction"] = "LEFT"
-    elif key == "ArrowRight" and game_state["direction"] != "LEFT":
-        game_state["direction"] = "RIGHT"
-    elif key == "ArrowUp" and game_state["direction"] != "DOWN":
-        game_state["direction"] = "UP"
-    elif key == "ArrowDown" and game_state["direction"] != "UP":
-        game_state["direction"] = "DOWN"
-    elif key == " " and game_state["game_over"]:  # Space to restart
-        reset_game()
-    
-    return "OK"
+@socketio.on('disconnect')
+def handle_disconnect():
+    clients.discard(request.sid)
 
-def reset_game():
-    """Reset game state"""
-    global game_state
-    game_state = {
-        "snake": [[WIDTH/2, HEIGHT/2]],
-        "food": [random.randrange(0, WIDTH-SNAKE_BLOCK, SNAKE_BLOCK), 
-                 random.randrange(0, HEIGHT-SNAKE_BLOCK, SNAKE_BLOCK)],
-        "direction": "RIGHT",
-        "game_over": False
-    }
-
-def update_game():
-    """Update game logic"""
-    global game_state
+@socketio.on('keypress')
+def handle_keypress(data):
+    global current_direction, game_over
     
-    if game_state["game_over"]:
+    key = data.get('key')
+    
+    if key == ' ' and game_over:
+        init_game()
         return
-    
-    head = game_state["snake"][0].copy()
-    
-    # Move snake
-    if game_state["direction"] == "LEFT":
-        head[0] -= SNAKE_BLOCK
-    elif game_state["direction"] == "RIGHT":
-        head[0] += SNAKE_BLOCK
-    elif game_state["direction"] == "UP":
-        head[1] -= SNAKE_BLOCK
-    elif game_state["direction"] == "DOWN":
-        head[1] += SNAKE_BLOCK
-    
-    # Check collisions
-    if (head[0] >= WIDTH or head[0] < 0 or 
-        head[1] >= HEIGHT or head[1] < 0 or
-        head in game_state["snake"]):
-        game_state["game_over"] = True
+        
+    if game_over:
         return
+        
+    key_mapping = {
+        'ArrowLeft': 'LEFT',
+        'ArrowRight': 'RIGHT',
+        'ArrowUp': 'UP',
+        'ArrowDown': 'DOWN'
+    }
     
-    game_state["snake"].insert(0, head)
-    
-    # Check food
-    if head == game_state["food"]:
-        game_state["food"] = [
-            random.randrange(0, WIDTH-SNAKE_BLOCK, SNAKE_BLOCK),
-            random.randrange(0, HEIGHT-SNAKE_BLOCK, SNAKE_BLOCK)
-        ]
-    else:
-        game_state["snake"].pop()
+    new_dir = key_mapping.get(key)
+    if new_dir and (
+        (new_dir == "LEFT" and current_direction != "RIGHT") or
+        (new_dir == "RIGHT" and current_direction != "LEFT") or
+        (new_dir == "UP" and current_direction != "DOWN") or
+        (new_dir == "DOWN" and current_direction != "UP")):
+        current_direction = new_dir
 
-# Background game updater
-import threading
-def game_loop():
-    import time
+def broadcast_state():
     while True:
-        update_game()
-        time.sleep(1/SNAKE_SPEED)
+        if clients:
+            state = {
+                "snake": snake,
+                "food": food,
+                "game_over": game_over,
+                "score": len(snake) - 1
+            }
+            socketio.emit('game_state', state)
+        socketio.sleep(0.1)
 
-threading.Thread(target=game_loop, daemon=True).start()
+threading.Thread(target=broadcast_state, daemon=True).start()
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=port)
