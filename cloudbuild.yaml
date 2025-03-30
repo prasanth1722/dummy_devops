@@ -1,21 +1,12 @@
 steps:
-  # Step 1: Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/my-python-app'
-      - '.'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/my-python-app', '.']
 
-  # Step 2: Push Docker image
   - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'gcr.io/$PROJECT_ID/my-python-app'
+    args: ['push', 'gcr.io/$PROJECT_ID/my-python-app']
 
-  # Step 3: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'gcloud'
+    entrypoint: 'gunicorn'
     args:
       - 'run'
       - 'deploy'
@@ -24,7 +15,10 @@ steps:
       - '--platform=managed'
       - '--region=us-central1'
       - '--allow-unauthenticated'
-      - '--timeout=300s'
-
+      - '--timeout=600s'
+      - '--port=8080'
+      - '--set-env-vars=PORT=8080'
+      - '--cpu=1'
+      - '--memory=1Gi'
 options:
   logging: CLOUD_LOGGING_ONLY
