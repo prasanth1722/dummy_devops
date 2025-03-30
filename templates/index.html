@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snake Game</title>
+    <style>
+        body { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            font-family: Arial;
+        }
+        canvas { 
+            border: 1px solid black; 
+            background: #000; 
+        }
+        #score { 
+            font-size: 24px; 
+            margin: 10px; 
+        }
+        #game-over { 
+            color: red; 
+            font-size: 32px; 
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Snake Game</h1>
+    <div id="score">Score: 0</div>
+    <div id="game-over">GAME OVER! Press Space</div>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const gameOverElement = document.getElementById('game-over');
+
+        // Colors
+        const COLORS = {
+            snake: '#3498db',
+            food: '#2ecc71',
+            text: '#ecf0f1'
+        };
+
+        // Handle game state updates
+        socket.on('game_state', (state) => {
+            // Clear canvas
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw snake
+            ctx.fillStyle = COLORS.snake;
+            state.snake.forEach(segment => {
+                ctx.fillRect(segment[0], segment[1], 10, 10);
+            });
+
+            // Draw food
+            ctx.fillStyle = COLORS.food;
+            ctx.fillRect(state.food[0], state.food[1], 10, 10);
+
+            // Update UI
+            scoreElement.textContent = `Score: ${state.score}`;
+            gameOverElement.style.display = state.game_over ? 'block' : 'none';
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+                e.preventDefault();
+                socket.emit('keypress', { key: e.key });
+            }
+        });
+
+        // Touch controls for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+        
+        canvas.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, false);
+
+        canvas.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+            
+            if (Math.abs(dx) > Math.abs(dy)) {
+                socket.emit('keypress', { key: dx > 0 ? 'ArrowRight' : 'ArrowLeft' });
+            } else {
+                socket.emit('keypress', { key: dy > 0 ? 'ArrowDown' : 'ArrowUp' });
+            }
+        }, false);
+    </script>
+</body>
+</html>
