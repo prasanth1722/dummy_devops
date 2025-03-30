@@ -1,17 +1,21 @@
+import eventlet
+eventlet.monkey_patch()  # MUST be first
+
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO
 import pygame
 import random
 import os
-from flask import Flask, render_template
-from flask_socketio import SocketIO
 import threading
 import json
 
-# Initialize pygame in headless mode
+# Initialize pygame
 os.environ['SDL_VIDEODRIVER'] = 'dummy'
 pygame.init()
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+app.config['SECRET_KEY'] = 'secret!'  # Change in production
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 # Game Constants
 WIDTH = 600
@@ -40,7 +44,7 @@ def game_loop():
     global snake, food, current_direction, game_over
     
     while True:
-        if not clients:  # Pause game when no players
+        if not clients:  # Pause when no players
             pygame.time.wait(100)
             continue
             
@@ -86,6 +90,10 @@ threading.Thread(target=game_loop, daemon=True).start()
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/health')
+def health():
+    return "OK", 200
 
 @socketio.on('connect')
 def handle_connect():
@@ -139,12 +147,14 @@ def broadcast_state():
 
 threading.Thread(target=broadcast_state, daemon=True).start()
 
-if __name__ == '__main__':
+def run_server():
     port = int(os.environ.get("PORT", 8080))
-    # Critical settings for Cloud Run:
     socketio.run(app,
                 host='0.0.0.0',
                 port=port,
-                allow_unsafe_werkzeug=True,  # Required for Cloud Run
                 debug=False,
-                use_reloader=False)
+                use_reloader=False,
+                log_output=True)
+
+if __name__ == '__main__':
+    run_server()
